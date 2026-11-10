@@ -1,0 +1,12 @@
+.env
+.env.local
+node_modules/
+.next/
+dist/
+*.db
+*.db-journal
+prisma/migrations/
+.ENV/
+env/
+.env/
+

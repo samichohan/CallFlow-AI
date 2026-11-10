@@ -1,0 +1,135 @@
+// prisma/schema.prisma
+// Supports SQLite locally. Change provider to "postgresql" for production.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────
+// CUSTOMER
+// ─────────────────────────────────────────────
+model Customer {
+  id        String   @id @default(cuid())
+  fullName  String
+  phone     String   @unique
+  email     String?
+  company   String?
+  status    String   @default("active") // active | inactive | vip
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  calls          Call[]
+  supportTickets SupportTicket[]
+  orders         Order[]
+}
+
+// ─────────────────────────────────────────────
+// ORDER
+// ─────────────────────────────────────────────
+model Order {
+  id                String      @id @default(cuid())
+  customerId        String
+  orderNumber       String      @unique // human-readable like ORD-1001
+  status            String      @default("pending") // pending | confirmed | processing | shipped | delivered | cancelled | returned
+  paymentStatus     String      @default("unpaid")  // unpaid | paid | refunded | partial
+  totalAmount       Float       @default(0)
+  currency          String      @default("USD")
+  deliveryAddress   String?
+  deliveryMethod    String?     @default("standard") // standard | express | pickup
+  trackingNumber    String?
+  carrier           String?     // FedEx | UPS | USPS | DHL
+  estimatedDelivery DateTime?
+  deliveredAt       DateTime?
+  notes             String?
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  customer   Customer    @relation(fields: [customerId], references: [id])
+  items      OrderItem[]
+}
+
+// ─────────────────────────────────────────────
+// ORDER ITEM
+// ─────────────────────────────────────────────
+model OrderItem {
+  id          String  @id @default(cuid())
+  orderId     String
+  productName String
+  sku         String?
+  quantity    Int     @default(1)
+  unitPrice   Float
+  totalPrice  Float
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+}
+
+// ─────────────────────────────────────────────
+// CALL
+// ─────────────────────────────────────────────
+model Call {
+  id           String    @id @default(cuid())
+  vapiCallId   String?   @unique
+  customerId   String?
+  phoneNumber  String?
+  callType     String    @default("inbound") // inbound | outbound | demo
+  status       String    @default("initiated") // initiated | ringing | in-progress | ended | failed | missed
+  duration     Int?      // seconds
+  transcript   String?
+  summary      String?
+  recordingUrl String?
+  outcome      String?   // resolved | escalated | voicemail | no-answer
+  startedAt    DateTime?
+  endedAt      DateTime?
+  createdAt    DateTime  @default(now())
+
+  customer Customer? @relation(fields: [customerId], references: [id])
+}
+
+// ─────────────────────────────────────────────
+// SUPPORT TICKET
+// ─────────────────────────────────────────────
+model SupportTicket {
+  id          String   @id @default(cuid())
+  customerId  String?
+  subject     String
+  description String
+  priority    String   @default("medium") // low | medium | high | urgent
+  status      String   @default("open")   // open | in-progress | resolved | closed
+  category    String   @default("general")// general | billing | technical | shipping | returns
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  customer Customer? @relation(fields: [customerId], references: [id])
+}
+
+// ─────────────────────────────────────────────
+// KNOWLEDGE BASE
+// ─────────────────────────────────────────────
+model KnowledgeBase {
+  id        String   @id @default(cuid())
+  title     String
+  content   String
+  category  String   @default("general") // faq | policy | instruction | general
+  tags      String?  // comma-separated
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ─────────────────────────────────────────────
+// WEBHOOK EVENT (for idempotency / dedup)
+// ─────────────────────────────────────────────
+model WebhookEvent {
+  id         String   @id @default(cuid())
+  vapiCallId String?
+  eventType  String
+  payload    String   // raw JSON string
+  processed  Boolean  @default(false)
+  error      String?
+  createdAt  DateTime @default(now())
+}
